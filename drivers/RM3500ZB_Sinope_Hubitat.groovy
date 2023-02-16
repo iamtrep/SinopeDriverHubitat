@@ -54,7 +54,7 @@ metadata
         input name: "energyPrice", type: "float", title: "c/kWh Cost:", description: "Electric Cost per Kwh in cent", range: "0..*", defaultValue: 9.38
         input name: "weeklyReset", type: "enum", title: "Weekly reset day", description: "Day on which the weekly energy meter return to 0", options:["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"], defaultValue: "Sunday", multiple: false, required: true
         input name: "yearlyReset", type: "enum", title: "Yearly reset month", description: "Month on which the yearly energy meter return to 0", options:["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"], defaultValue: "January", multiple: false, required: true
-        //input name: "prefWaterTempMin", type: "bool", title: "Enable safety minimum water temperature 45°C/113°F feature", defaultValue: true
+        input name: "prefSatefyWaterTemp", type: "bool", title: "Enable safety minimum water temperature feature (45°C/113°F)", defaultValue: true
         input name: "infoEnable", type: "bool", title: "Enable descriptionText logging", defaultValue: true
         input name: "debugEnable", type: "bool", title: "Enable debug logging", defaultValue: true
     }
@@ -100,7 +100,7 @@ def uninstalled() {
     try {
         unschedule()
     } catch (errMsg) {
-        log.info "uninstalled(): Error unschedule() - ${errMsg}"
+        log.error "uninstalled(): Error unschedule() - ${errMsg}"
     }
 }
 
@@ -135,7 +135,6 @@ private createCustomMap(descMap){
     if (descMap.cluster == "0006" && descMap.attrId == "0000") {
         map.name = "switch"
         map.value = getSwitchStatus(descMap.value)
-        //map.value = getSwitchMap()[descMap.value]   // Changed method so that we can use log.info since this device has a physical switch on the device
         map.type = state.switchTypeDigital ? "digital" : "physical"
         state.switchTypeDigital = false
         map.descriptionText = "Water heater switch is ${map.value} [${map.type}]"
@@ -252,23 +251,26 @@ def configure(){
 		energyChange = 10 as int
 
     cmds += zigbee.configureReporting(0x0402, 0x0000, 0x29, 30, 580, (int) tempChange)  //local temperature
-    cmds += zigbee.configureReporting(0x0500, 0x0002, DataType.BITMAP16, 0, 600, null)
-    cmds += zigbee.configureReporting(0x0006, 0x0000, 0x10, 0, 600, null)           //On off state
+    cmds += zigbee.configureReporting(0x0500, 0x0002, DataType.BITMAP16, 0, 0, null)  //water state no periodic reporting
+    cmds += zigbee.configureReporting(0x0006, 0x0000, 0x10, 0, 0, null)           //On off state no periodic reporting
     cmds += zigbee.configureReporting(0x0B04, 0x050B, 0x29, 30, 600, (int) powerReport)
     cmds += zigbee.configureReporting(0x0702, 0x0000, DataType.UINT48, 299, 1799, (int) energyChange) //Energy reading
 
-	// Configure Water Temp Min
-	if (prefWaterTempMin) {
-		cmds += zigbee.writeAttribute(0xFF01, 0x0076, 0x21, 45)  //set water temp min to 45 (only acceptable value)
-	} else {
-		cmds += zigbee.writeAttribute(0xFF01, 0x0076, 0x21, 0)  //set water temp min to 0 (disabled)
-	}
+    // Configure Safety Water Temp
+    if (!prefSatefyWaterTemp) {
+        log.warn "Satety Water Temperature turned off, water temperature can go below 45°C / 113°F without turning back on"
+        cmds += zigbee.writeAttribute(0xFF01, 0x0076, DataType.UINT8, 0, [mfgCode: "0x119C"])  //set water temp min to 0 (disabled)
+    } else {
+        if (infoEnable) log.info "Satety Water Temperature turned on"
+        cmds += zigbee.writeAttribute(0xFF01, 0x0076, DataType.UINT8, 45, [mfgCode: "0x119C"])  //set water temp min to 45 (only acceptable value)
+    }
 
 
     if (cmds)
       sendZigbeeCommands(cmds) // Submit zigbee commands
     return
 }
+
 
 def refresh() {
     if (infoEnable) log.info "refresh()"
@@ -284,7 +286,6 @@ def refresh() {
     if (cmds)
         sendZigbeeCommands(cmds) // Submit zigbee commands
 }
-
 
 def off() {
     if (debugEnable) log.debug "command switch OFF"
@@ -470,13 +471,6 @@ private getSwitchStatus(value) {
             return "on"
             break
     }
-}
-
-private getSwitchMap() {
-  [
-    "00": "off",
-    "01": "on",
-  ]
 }
 
 private getActivePower(value) {
