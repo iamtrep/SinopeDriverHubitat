@@ -160,7 +160,7 @@ private createCustomMap(descMap){
             case "0508":
                 // RMSCurrent
                 map.name = "current"
-                map.value = Integer.parseInt(descMap.value, 16)
+                map.value = Integer.parseInt(descMap.value, 16) / 1000 // attribute report is in mA
                 map.unit = "A"
                 map.descriptionText = "Current is ${map.value} ${map.unit}"
                 break
@@ -194,7 +194,7 @@ private createCustomMap(descMap){
         def isChange = isStateChange(device, map.name, map.value.toString())
         map.displayed = isChange         // not sure what this does as it's not a documented parameter for sendEvent()
         //map.isStateChange = isChange   // don't set, let default platform filtering happen.  See sendEvent() documentation
-        //logDebug("event map : ${map}")
+        logDebug("event map : ${map}")
         if (map.descriptionText) logInfo("${map.descriptionText}")
         result = createEvent(map)
     }
