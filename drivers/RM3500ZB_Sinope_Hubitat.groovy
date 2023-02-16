@@ -251,11 +251,12 @@ def configure(){
 	if (energyChange == null)
 		energyChange = 10 as int
 
-    cmds += zigbee.configureReporting(0x0402, 0x0000, 0x29, 30, 580, (int) tempChange)  //local temperature
-    cmds += zigbee.configureReporting(0x0500, 0x0002, DataType.BITMAP16, 0, 0, null)  //water state no periodic reporting
-    cmds += zigbee.configureReporting(0x0006, 0x0000, 0x10, 0, 0, null)           //On off state no periodic reporting
-    cmds += zigbee.configureReporting(0x0B04, 0x050B, 0x29, 30, 600, (int) powerReport)
-    cmds += zigbee.configureReporting(0x0702, 0x0000, DataType.UINT48, 299, 1799, (int) energyChange) //Energy reading
+    // Configure min/max periodic report times.
+    cmds += zigbee.configureReporting(0x0006, 0x0000, 0x10, 3600, 7200)                               // Heater switch on/off state - 1-2h
+    cmds += zigbee.configureReporting(0x0402, 0x0000, 0x29, 30, 580, (int) tempChange)                // Water temperature - 30s - 10m
+    cmds += zigbee.configureReporting(0x0500, 0x0002, DataType.BITMAP16, 3600, 7200)                  // Water leak sensor - 1-2h
+    cmds += zigbee.configureReporting(0x0B04, 0x050B, 0x29, 30, 600, (int) powerReport)               // Power report - 30s - 10m
+    cmds += zigbee.configureReporting(0x0702, 0x0000, DataType.UINT48, 299, 1799, (int) energyChange) // Energy report - 5m - 30m
 
     // Configure Safety Water Temp
     if (!prefSatefyWaterTemp) {
